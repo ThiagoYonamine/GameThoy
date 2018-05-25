@@ -5,25 +5,34 @@ using UnityEngine;
 public class EnemyController : MonoBehaviour {
 
 	[SerializeField]
-	private Stat health;
+	public Stat health;
 
 	public HeroController hero;
+	public Menu menu;
+
 	private Animator anim;
 	private int attackHash = Animator.StringToHash("Attack");
 	private int hitHash = Animator.StringToHash("Hit");
 	private int dieHash = Animator.StringToHash("Die");
-	private float attackRate = 2f;
-	private float nextAttack = 0.0f;
+	private float attackRate;
+	private float nextAttack = 6f;
 
 	private bool alive = true;
+	private Attribute attribute;
 
 	void Start () {
 		anim = GetComponent<Animator> ();
+		string enemy = "Enemy/enemy" + LevelController.currentLevel;
+		anim.runtimeAnimatorController = Resources.Load (enemy) as RuntimeAnimatorController;
 	}
 
 	void Awake(){
-		health.Initialize ();	
 		PopupTextController.Initialize ();
+		attribute = new Attribute ();
+		setEnemyStatus ();
+		health.MaxValue = attribute.getLife();
+		health.CurrentValue = health.MaxValue;
+		attackRate = attribute.getDelay();
 	}
 
 	void FixedUpdate () {
@@ -46,17 +55,21 @@ public class EnemyController : MonoBehaviour {
 			nextAttack = Time.time + attackRate;
 	}
 
-	public void hit(int damage, bool critical){
+	public void hit(int damage, bool critical, float dex){
 		if (alive) {
-			PopupTextController.createPopupText (damage.ToString(), new Vector2(transform.position.x+0.5f, transform.position.y+2), critical);
-			anim.Play (hitHash);
-			health.CurrentValue -= damage;
+			int totalDamage = attribute.getHit (damage, dex);
+			PopupTextController.createPopupText (totalDamage.ToString(), new Vector2(transform.position.x+0.5f,transform.position.y+2), critical);
+			if (totalDamage > 0) {
+				anim.Play (hitHash);
+			}
+			health.CurrentValue -= totalDamage;
 		}
 	}
 
 	//this method is called inside animation
 	public void hitHero(){
-		hero.hit ();
+		bool critical = attribute.getCritical ();
+		hero.hit (attribute.getDamage(critical,1),critical, attribute.getDex());
 	}
 
 	private void die(){
@@ -64,4 +77,36 @@ public class EnemyController : MonoBehaviour {
 		anim.Play (dieHash);
 	}
 
+	public void dropMenu(){
+		menu.drop ("Victory");
+	}
+
+
+	private void setEnemyStatus(){
+		switch (LevelController.currentLevel){
+
+		case 1:
+			attribute.setStr (10);
+			attribute.setDef (1);
+			attribute.setAgi (1);
+			attribute.setDex (15);
+			attribute.setLuck (1);
+			break;
+		case 2:
+			attribute.setStr (30);
+			attribute.setDef (20);
+			attribute.setAgi (10);
+			attribute.setDex (30);
+			attribute.setLuck (30);
+			break;
+		default:
+			attribute.setStr (10);
+			attribute.setDef (10);
+			attribute.setAgi (10);
+			attribute.setDex (10);
+			attribute.setLuck (10);
+			break;
+		}
+
+	}
 }

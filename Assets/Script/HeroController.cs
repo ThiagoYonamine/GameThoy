@@ -2,15 +2,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+
 public class HeroController : MonoBehaviour {
 
 	[SerializeField]
-	private Stat health;
+	public Stat health;
 
 	[SerializeField]
-	private Stat energy;
+	public Stat energy;
 
 	public EnemyController enemy;
+	public Menu menu;
 
 	public Button attack1_btn;
 	public Button attack2_btn;
@@ -21,15 +23,11 @@ public class HeroController : MonoBehaviour {
 	private int hitHash = Animator.StringToHash("Hit");
 	private int dieHash  = Animator.StringToHash("Die");
 
-	private float attackRate = 2f;
+	private float attackRate;
 	private float nextAttack1 = 0.0f;
 	private float nextAttack2 = 0.0f;
 
-	//hero attributes
 	private bool alive = true;
-	private float str = 10; // strenght
-	private float luck = 50; 
-
 	private Attribute attribute;
 
 	void Start () {
@@ -40,20 +38,24 @@ public class HeroController : MonoBehaviour {
 	}
 
 	void Awake(){
-		health.Initialize ();	
-		energy.Initialize ();
 		PopupTextController.Initialize ();
 		attribute = new Attribute ();
-		attribute.setStr (10);
-		attribute.setDef (15);
-		attribute.setAgi (55);
-		attribute.setDex (10);
-		attribute.setLuck (10);
+		attribute.setStr (PlayerPrefs.GetFloat("str"));
+		attribute.setDef (PlayerPrefs.GetFloat("def"));
+		attribute.setAgi (PlayerPrefs.GetFloat("agi"));
+		attribute.setDex (PlayerPrefs.GetFloat("dex"));
+		attribute.setLuck (PlayerPrefs.GetFloat("luck"));
+		attribute.setEnergy (PlayerPrefs.GetFloat("energy"));
+		health.MaxValue = attribute.getLife();
+		health.CurrentValue = health.MaxValue;
+		energy.MaxValue = attribute.getTotalEnergy ();
+		energy.CurrentValue = energy.MaxValue;
+		attackRate = attribute.getDelay();
 	}
 
 	void FixedUpdate(){
 		if (alive) {
-			energy.CurrentValue += 0.1f;
+			energy.CurrentValue += attribute.getRecovery();
 		}
 	}
 		
@@ -66,11 +68,15 @@ public class HeroController : MonoBehaviour {
 	}
 
 	private void setInteractables(){
-		if (Time.time > nextAttack1 && energy.CurrentValue >= 20 ) {
+		if (Time.time > nextAttack1 && energy.CurrentValue >= 20) {
 			attack1_btn.interactable = true;
+		} else {
+			attack1_btn.interactable = false;
 		}
 		if (Time.time > nextAttack2 && energy.CurrentValue >= 30) {
 			attack2_btn.interactable = true;
+		} else {
+			attack2_btn.interactable = false;
 		}
 	}
 
@@ -78,24 +84,25 @@ public class HeroController : MonoBehaviour {
 		anim.Play (attackHash);
 		energy.CurrentValue -= 20;
 		nextAttack1 = Time.time + attackRate;
-		attack1_btn.interactable = false;
+		//attack1_btn.interactable = false;
 	}
 
 	public void attack2(){
 		anim.Play (attack2Hash);
 		energy.CurrentValue -= 30;
-		nextAttack2 = Time.time + attackRate;
-		attack2_btn.interactable = false;
+		nextAttack2 = Time.time + attackRate*1.5f;
+		//attack2_btn.interactable = false;
 	}
 
-	public void hit(){
+	//when player is attacked
+	public void hit(int damage, bool critical, float dex){
 		if (alive) {
-			int hitDamage = attribute.getHit (10);
-			PopupTextController.createPopupText (hitDamage.ToString(), new Vector2(transform.position.x,transform.position.y+3), false);
-			if (hitDamage > 0) {
+			int totalDamage = attribute.getHit (damage, dex);
+			PopupTextController.createPopupText (totalDamage.ToString(), new Vector2(transform.position.x,transform.position.y+3), critical);
+			if (totalDamage > 0) {
 				anim.Play (hitHash);
 			}
-			health.CurrentValue -= hitDamage;
+			health.CurrentValue -= totalDamage;
 		}
 	}
 		
@@ -106,12 +113,16 @@ public class HeroController : MonoBehaviour {
 		anim.Play (dieHash);
 	}
 
+	//when player attack the enemy
 	public void hitEnemy(float power){
 		//attack is passed in animation attack
 		bool critical = attribute.getCritical ();
-		enemy.hit (attribute.getDamage(critical, power),critical);
+		enemy.hit (attribute.getDamage (critical, power), critical, attribute.getDex());
 	}
 
+	public void dropMenu(){
+		menu.drop ("Defeat");
+	}
 
 		
 }
